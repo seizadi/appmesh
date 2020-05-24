@@ -44,10 +44,52 @@ Verify kustomize is working before commit
 ```bash
 kubectl apply --dry-run -k .
 ```
-## Setup kustomize
-
+When we commit this will get deployed to the cluster
 ```bash
-for dir in ./flux ./base; do
-  ( pushd "$dir" && kustomize create --autodetect --recursive )
-done
+$ git add .
+$ git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        new file:   .flux.yaml
+        modified:   README.md
+        new file:   base/kustomization.yaml
+        new file:   flux/kustomization.yaml
+        new file:   kustomization.yaml
+```
+Now we commit the changes and use fluxctl sync to force change
+rather than wait for the poll cycle to apply:
+```bash
+$ git push
+$ fluxctl sync --k8s-fwd-ns flux
+```
+
+## Setup canary
+The 'make repo' step above lays down a sample application
+[podinfo](https://github.com/stefanprodan/podinfo), which is under the base
+directory, you could have a more complex application but this is a good way to
+test the Flux canary provider by 
+[Flagger](https://www.weave.works/oss/flagger/)
+and integration with AWS AppMesh.
+![appmesh](doc/img/eks-appmesh-flagger-stack.png)
+
+Here is the layout of demo app under base/demo
+directory:
+```bash
+$ tree base/demo
+base/demo
+├── ingress
+│   └── appmesh-gateway.yaml
+├── namespace.yaml
+├── podinfo
+│   ├── canary.yaml
+│   ├── deployment.yaml
+│   └── hpa.yaml
+└── tester
+    ├── deployment.yaml
+    ├── service.yaml
+    └── virtual-node.yaml
 ```
