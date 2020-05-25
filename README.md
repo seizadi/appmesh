@@ -250,6 +250,7 @@ Watch Flagger logs:
 kubectl -n appmesh-system logs deployment/flagger -f | jq .msg
 ```
 ## Canary Rollback
+
 This section we will promote the podinfo to a new release and watch canary
 rollback. During the canary analysis you can generate HTTP 500 errors and high latency
 to test if Flagger pauses and rolls back the faulted version. For this follow
@@ -280,3 +281,90 @@ git commit -m "update podinfo to release 3.1.2"
 git push
 fluxctl sync --k8s-fwd-ns flux
 ```
+Exec into the tester pod and generate HTTP 500 errors:
+```bash
+kubectl -n demo exec -it $(kubectl -n demo get pods -o name | grep -m1 flagger-loadtester | cut -d'/' -f 2) bash
+```
+```bash
+bash-5.0$ hey -z 1m -c 5 -q 5 http://podinfo-canary.demo:9898/status/500
+bash-5.0$ hey -z 1m -c 5 -q 5 http://podinfo-canary.demo:9898/delay/1
+```
+When the number of failed checks reaches the canary analysis threshold,
+the traffic is routed back to the primary and the canary is scaled to zero.
+
+Watch Flagger logs with:
+```bash
+kubectl -n appmesh-system logs deployment/flagger -f | jq .msg
+```
+
+## A/B Testing
+
+Besides weighted routing, Flagger can be configured to route traffic to the canary based on
+HTTP match conditions. In an A/B testing scenario, you'll be using HTTP headers or
+cookies to target a certain segment of your users. This is particularly useful for 
+frontend applications that require session affinity.
+For this follow
+[Eks Handson Lab for detail](https://eks.handson.flagger.dev/canary/#a-b-testing).
+
+Create a Kustomize patch for the canary configuration by removing 
+the max/step weight and adding a HTTP header match condition and iterations:
+```bash
+cat <<EOF | tee overlays/canary.yaml
+apiVersion: flagger.app/v1beta2
+kind: Canary
+metadata:
+  name: podinfo
+  namespace: demo
+spec:
+  analysis:
+    interval: 30s
+    threshold: 10
+    iterations: 10
+    match:
+      - headers:
+          user-agent:
+            regex: ".*Chrome.*"
+EOF
+```
+
+The above configuration will run a canary analysis for 
+five minutes (interval * iterations) targeting users with Chromium-based browsers, other
+browsers FireFox or Safari see the older release. Add the canary patch to the kustomization:
+```bash
+cat <<EOF | tee kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - base
+  - flux
+patchesStrategicMerge:
+  - overlays/podinfo.yaml
+  - overlays/canary.yaml
+EOF
+```
+Change the release to 3.1.3
+```bash
+$ git diff overlays/podinfo.yaml 
+diff --git a/overlays/podinfo.yaml b/overlays/podinfo.yaml
+index a6dfbb0..0ab5fd4 100644
+--- a/overlays/podinfo.yaml
++++ b/overlays/podinfo.yaml
+@@ -8,7 +8,7 @@ spec:
+     spec:
+       containers:
+         - name: podinfod
+-          image: stefanprodan/podinfo:3.1.2
++          image: stefanprodan/podinfo:3.1.3
+           env:
+             - name: PODINFO_UI_LOGO
+               value: https://eks.handson.flagger.dev/cuddle_bunny.gif
+```
+Commit and push changes so that we promote new release:
+```bash
+git add .
+git commit -m "update podinfo to release 3.1.3"
+git push
+fluxctl sync --k8s-fwd-ns flux
+```
+
+
