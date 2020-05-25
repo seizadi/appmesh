@@ -170,6 +170,7 @@ Assuming everything is working you should the podinfo page:
 ![podinfo](doc/img/podinfo.png)
 
 ## Canary Promotion
+
 This section we will promote the podinfo to a new release and watch canary
 promotion, for this follow
 [Eks Handson Lab for detail](https://eks.handson.flagger.dev/canary/#automated-canary-promotion).
@@ -237,5 +238,45 @@ Flux when we comit the change:
 git add .
 git commit -m "podinfo bumped to release 3.1.1 with new logo"
 git push
+fluxctl sync --k8s-fwd-ns flux
 ```
+When Flagger detects that the deployment revision changed it will start a new rollout. 
+You can monitor the traffic shifting with:
+```bash
+kubectl -n demo get --watch canaries
+```
+Watch Flagger logs:
+```bash
+kubectl -n appmesh-system logs deployment/flagger -f | jq .msg
+```
+## Canary Rollback
+This section we will promote the podinfo to a new release and watch canary
+rollback. During the canary analysis you can generate HTTP 500 errors and high latency
+to test if Flagger pauses and rolls back the faulted version. For this follow
+[Eks Handson Lab for detail](https://eks.handson.flagger.dev/canary/#automated-rollback).
 
+In this test we will promote to a release 3.1.2 that has been instrumented to fail and
+cause Flagger to rollback to the previous 3.1.1 release:
+```bash
+$ git diff overlays/podinfo.yaml 
+diff --git a/overlays/podinfo.yaml b/overlays/podinfo.yaml
+index a9410d1..a6dfbb0 100644
+--- a/overlays/podinfo.yaml
++++ b/overlays/podinfo.yaml
+@@ -8,7 +8,7 @@ spec:
+     spec:
+       containers:
+         - name: podinfod
+-          image: stefanprodan/podinfo:3.1.1
++          image: stefanprodan/podinfo:3.1.2
+           env:
+             - name: PODINFO_UI_LOGO
+               value: https://eks.handson.flagger.dev/cuddle_bunny.gif
+```
+Commit changes:
+```bash
+git add .
+git commit -m "update podinfo to release 3.1.2"
+git push
+fluxctl sync --k8s-fwd-ns flux
+```
