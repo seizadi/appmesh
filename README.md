@@ -362,7 +362,7 @@ index a6dfbb0..0ab5fd4 100644
 Commit and push changes so that we promote new release:
 ```bash
 git add .
-git commit -m "update podinfo to release 3.1.3"
+git commit -m "update podinfo to release 3.1.3 Again!"
 git push
 fluxctl sync --k8s-fwd-ns flux
 ```
