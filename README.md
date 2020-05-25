@@ -362,9 +362,32 @@ index a6dfbb0..0ab5fd4 100644
 Commit and push changes so that we promote new release:
 ```bash
 git add .
-git commit -m "update podinfo to release 3.1.3 Again!"
+git commit -m "update podinfo to release 3.1.3 again with fix to kustomize"
 git push
 fluxctl sync --k8s-fwd-ns flux
 ```
 
-
+## Debug
+As murphy would have it for my last test I started getting these errors:
+```bash
+$ fluxctl sync --k8s-fwd-ns flux
+Synchronizing with ssh://git@github.com/seizadi/appmesh
+Revision of master to apply is e9f0a4e
+Waiting for e9f0a4e to be applied ...
+Error: timeout
+```
+Look at flex controller logs:
+```bash
+kubectl -n flux logs deployment/flux
+....
+ts=2020-05-25T06:15:28.88533029Z caller=loop.go:107 component=sync-loop err="loading resources from repo: error executing generator command \"kustomize build .\" from file \".flux.yaml\": exit status 1\nerror output:\nError: no matches for OriginalId flagger.app_v1beta2_Canary|demo|podinfo; no matches for CurrentId flagger.app_v1beta2_Canary|demo|podinfo; failed to find unique target for patch flagger.app_v1beta2_Canary|podinfo\n\ngenerated output:\nError: no matches for OriginalId flagger.app_v1beta2_Canary|demo|podinfo; no matches for CurrentId flagger.app_v1beta2_Canary|demo|podinfo; failed to find unique target for patch flagger.app_v1beta2_Canary|podinfo\n"
+ts=2020-05-25T06:17:53.068604425Z caller=images.go:17 component=sync-loop msg="polling for new images for automated workloads"
+ts=2020-05-25T06:17:53.167381283Z caller=images.go:23 component=sync-loop error="getting unlocked automated resources: error executing generator command \"kustomize build .\" from file \".flux.yaml\": exit status 1\nerror output:\nError: no matches for OriginalId flagger.app_v1beta2_Canary|demo|podinfo; no matches for CurrentId flagger.app_v1beta2_Canary|demo|podinfo; failed to find unique target for patch flagger.app_v1beta2_Canary|podinfo\n\ngenerated output:\nError: no matches for OriginalId flagger.app_v1beta2_Canary|demo|podinfo; no matches for CurrentId flagger.app_v1beta2_Canary|demo|podinfo; failed to find unique target for patch flagger.app_v1beta2_Canary|podinfo\n"
+```
+Looks like we broke Kustomize with our checkin, we can verify this by running it. This would be
+a good test to have on your PRs before allowing a promotion.
+localy:
+```bash
+$ kubectl apply --dry-run -k .
+error: failed to find an object with flagger.app_v1beta2_Canary|podinfo to apply the patch
+```
