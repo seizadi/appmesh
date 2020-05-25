@@ -10,6 +10,14 @@ This is created using:
 make repo
 make mesh
 ```
+The project is a demo of Weaveworks partnership with AWS to deploy a Gitops native k8s deployment
+pipeline. The manifests in ./base/appmesh-system and ./base/kube-system and ./flux would be
+removed and will be part of cluster orchestration as the services deployed would be used by
+all applications. The cluster services that are orchestrated by the manifest are:
+   * Declare CRDs used by AWS AppMesh and Weaveworks Flux and Flagger
+   * Deploy Flux system including Flux Controller, Helm Operator and Memcache
+   * Deploy AppMesh system including AppMesh Controller, Grafana, Prometheus and Flagger
+   * Deploy Prometheus server used as Metrics Server in the cluster
 
 We use [kustomize](https://github.com/kubernetes-sigs/kustomize) to setup the project for the pipeline
 deployment:
@@ -43,6 +51,10 @@ EOF
 Verify kustomize is working before commit
 ```bash
 kubectl apply --dry-run -k .
+```
+You can see the deployed manifests:
+```bash
+kustomize build . | more
 ```
 When we commit this will get deployed to the cluster
 ```bash
@@ -81,15 +93,37 @@ directory:
 ```bash
 $ tree base/demo
 base/demo
-├── ingress
+├── ingress # Envoy Proxy
 │   └── appmesh-gateway.yaml
 ├── namespace.yaml
-├── podinfo
+├── podinfo # Demo Application
 │   ├── canary.yaml
 │   ├── deployment.yaml
 │   └── hpa.yaml
-└── tester
+└── tester # Flagger Test Runner
     ├── deployment.yaml
     ├── service.yaml
     └── virtual-node.yaml
+```
+We can orchestrate the canary release using
+[CRD Canary](base/demo/podinfo/canary.yaml).
+[See Flagger Cannary detail description](https://eks.handson.flagger.dev/canary/#canary-custom-resource).
+Flagger controls 
+[Deployment](base/demo/podinfo/deployment.yaml) and
+[Horizontal Pod Authoscaler (HPA)](base/demo/podinfo/hpa.yaml).
+    
+The initial demo application is installed with annotation so that it is
+ignored by Flux this allows us to stage the overall system and also follow
+lab:
+```yaml
+  annotations:
+    fluxcd.io/ignore: "true"
+```
+We set this annotation in [namespace.yaml](base/demo/namespace.yaml) to
+false and commit the change so that Flux will deploy it:
+```bash
+git add .
+git commit -m "run demo"
+git push
+fluxctl sync --k8s-fwd-ns flux
 ```
