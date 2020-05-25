@@ -127,3 +127,115 @@ git commit -m "run demo"
 git push
 fluxctl sync --k8s-fwd-ns flux
 ```
+Now you see the demo namespace and associated deployment:
+```bash
+$ kubectl -n demo get deployments
+NAME                 READY   UP-TO-DATE   AVAILABLE   AGE
+appmesh-gateway      1/1     1            1           93s
+flagger-loadtester   1/1     1            1           94s
+podinfo              0/0     0            0           94s
+podinfo-primary      2/2     2            2           85s
+$ kubectl -n demo get pods
+NAME                                READY   STATUS    RESTARTS   AGE
+appmesh-gateway-6db54dd9f-w7lvk     3/3     Running   0          67s
+flagger-loadtester-8cc68bcc-4xp6v   2/2     Running   0          68s
+podinfo-primary-5dc7849445-kr999    2/2     Running   0          59s
+podinfo-primary-5dc7849445-qgsr9    1/2     Running   0          4s
+```
+Make sure canary is initalized:
+```bash
+$ kubectl -n demo get canary
+NAME      STATUS        WEIGHT   LASTTRANSITIONTIME
+podinfo   Initialized   0        2020-05-25T04:49:07Z
+```
+Now we can find the URL for the application:
+```bash
+export URL="http://$(kubectl -n demo get svc/appmesh-gateway -ojson | jq -r ".status.loadBalancer.ingress[].hostname")"
+echo $URL
+```
+Make sure DNS is servered for it:
+```bash
+watch host $URL
+```
+Make sure webserver is operational:
+```bash
+watch curl -s $URL
+
+```
+Open browser to show webpage:
+```bash
+open $URL
+```
+Assuming everything is working you should the podinfo page:
+![podinfo](doc/img/podinfo.png)
+
+## Canary Promotion
+This section we will promote the podinfo to a new release and watch canary
+promotion, for this follow
+[Eks Handson Lab for detail](https://eks.handson.flagger.dev/canary/#automated-canary-promotion).
+```bash
+mkdir -p overlays && \
+cat << EOF | tee overlays/podinfo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: podinfod
+          image: stefanprodan/podinfo:3.1.1
+          env:
+            - name: PODINFO_UI_LOGO
+              value: https://eks.handson.flagger.dev/cuddle_bunny.gif
+EOF
+```
+This overlay, changes the podinfo image from 3.1.0 and cuddle_clap logo
+```yaml
+        image: stefanprodan/podinfo:3.1.0
+        env:
+          - name: PODINFO_UI_LOGO
+            value: https://eks.handson.flagger.dev/cuddle_clap.gif
+```
+to 3.1.1 and the logo to a cuddle_bunny:
+```bash
+mkdir -p overlays && \
+cat << EOF | tee overlays/podinfo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: podinfod
+          image: stefanprodan/podinfo:3.1.1
+          env:
+            - name: PODINFO_UI_LOGO
+              value: https://eks.handson.flagger.dev/cuddle_bunny.gif
+EOF
+```
+We update kustomize to apply this change to the manifest:
+```bash
+cat << EOF | tee kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - base
+  - flux
+patchesStrategicMerge:
+  - overlays/podinfo.yaml
+EOF
+```
+This will be picked up by
+Flux when we comit the change:
+```bash
+git add .
+git commit -m "podinfo bumped to release 3.1.1 with new logo"
+git push
+```
+
