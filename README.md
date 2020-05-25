@@ -366,6 +366,9 @@ git commit -m "update podinfo to release 3.1.3 again with fix to kustomize"
 git push
 fluxctl sync --k8s-fwd-ns flux
 ```
+I could not get A/B routing to work, see debug log below.
+
+## 
 
 ## Debug
 As murphy would have it for my last test I started getting these errors:
@@ -391,4 +394,37 @@ localy:
 $ kubectl apply --dry-run -k .
 error: failed to find an object with flagger.app_v1beta2_Canary|podinfo to apply the patch
 ```
-I set the canary overlay to 
+I set the canary overlay to 'apiVersion: flagger.app/v1beta1' which fixed the above error but
+the routing did not work why it was probably changed. When I try to set it v1beta2 I get this error
+```bash
+$ kubectl apply --dry-run -k .
+...
+error: unable to recognize ".": no matches for kind "Canary" in version "flagger.app/v1beta2"
+```
+Since the 
+[CRD applied to the cluster](base/appmesh-system/flagger-crds.yaml)
+for the demo only supports v1beta1:
+```bash
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: canaries.flagger.app
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: flagger.app
+  version: v1beta1
+  versions:
+    - name: v1beta1
+      served: true
+      storage: true
+    - name: v1alpha3
+      served: true
+      storage: false
+    - name: v1alpha2
+      served: false
+      storage: false
+    - name: v1alpha1
+      served: false
+      storage: false
+```
