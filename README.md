@@ -391,3 +391,4 @@ localy:
 $ kubectl apply --dry-run -k .
 error: failed to find an object with flagger.app_v1beta2_Canary|podinfo to apply the patch
 ```
+I set the canary overlay to 
