@@ -368,7 +368,43 @@ fluxctl sync --k8s-fwd-ns flux
 ```
 I could not get A/B routing to work, see debug log below.
 
-## 
+## Creating and Running Canary Tests
+The demo application has a test runner pod deployed and we can use webhooks in Flagger to run
+automated tests for each release. For this follow
+[Eks Handson Lab for detail](https://eks.handson.flagger.dev/test/#create-tests).
+```yaml
+cat << EOF | tee overlays/canary.yaml
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: podinfo
+  namespace: demo
+spec:
+  analysis:
+    webhooks:
+      - name: acceptance-test-token
+        type: pre-rollout
+        url: http://flagger-loadtester.demo/
+        timeout: 30s
+        metadata:
+          type: bash
+          cmd: "curl -sd 'test' http://podinfo-canary.demo:9898/token | grep token"
+      - name: acceptance-test-tracing
+        type: pre-rollout
+        url: http://flagger-loadtester.demo/
+        timeout: 30s
+        metadata:
+          type: bash
+          cmd: "curl -s http://podinfo-canary.demo:9898/headers | grep X-Request-Id"
+      - name: load-test
+        url: http://flagger-loadtester.demo/
+        timeout: 5s
+        metadata:
+          cmd: "hey -z 1m -q 10 -c 2 http://podinfo-canary.demo:9898/"
+EOF
+```
+We set the release to 3.1.4 and test the tests.
+                                 
 
 ## Debug
 As murphy would have it for my last test I started getting these errors:
