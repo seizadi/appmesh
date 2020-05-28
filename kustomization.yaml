@@ -4,5 +4,5 @@ bases:
   - base
   - flux
 patchesStrategicMerge:
-  - overlays/podinfo.yaml
-  - overlays/canary.yaml
+#  - overlays/podinfo.yaml
+#  - overlays/canary.yaml
