@@ -403,8 +403,31 @@ spec:
           cmd: "hey -z 1m -q 10 -c 2 http://podinfo-canary.demo:9898/"
 EOF
 ```
-We set the release to 3.1.4 and test the tests.
-                                 
+We set the release to 3.1.4 and check the logs for the test being run from webhook:
+```bash
+"Starting canary analysis for podinfo.demo"
+"Pre-rollout check acceptance-test-token passed"
+"Pre-rollout check acceptance-test-tracing passed"
+"Advance podinfo.demo canary weight 5"
+```
+
+## AWS XRay integration with AppMesh
+One of key points of ServiceMesh architecture is to enable logging and tracing without any
+changes to the application. I thought that tracing would work with AppMesh but I was dissapointed that this does not
+work out of the box, 
+[see following AWS Note](https://aws.amazon.com/blogs/compute/integrating-aws-x-ray-with-aws-app-mesh/)
+on how to enable it.
+
+## AWS CloudWatch integration with AppMesh
+Similarly AppMesh logs are not in CloudWatch either, they require running FluentD in
+the cluster and pushing the logs out. This is a common pattern for log collection, there is 
+[partial note here around access logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights-Prometheus-Sample-Workloads-appmesh-envoy.html)                              
+
+## Cleanup
+After you have finished the hands-on lab and was to terminate the cluster run
+```bash
+make clean
+```
 
 ## Debug
 As murphy would have it for my last test I started getting these errors:
